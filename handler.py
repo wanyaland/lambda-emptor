@@ -1,26 +1,31 @@
-from bs4 import BeautifulSoup
 import json
-import requests
-import logging 
+import logging
 import sys
+import requests
+
+
+from bs4 import BeautifulSoup
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def extracts_title(event, context):
-    '''
-     Handler that webscrapes a specified url and returns Page Title
-    '''
-
+    """ Handler that scrapes a web page via given url and
+        returns json body that contains the title of the web page
+    """
+    logger.info('Event received: {}'.format(json.dumps(event)))
     url = json.loads(event['body'])['url']
     try:
         source = requests.get(url)
-    except requests.exceptions.RequestException as e:
-        logging.info(e)
+    except requests.exceptions.RequestException as exc:
+        logging.info(exc)
         sys.exit(1)
 
-    soup = BeautifulSoup(source.text)
-   
+    soup = BeautifulSoup(source.text, 'html.parser')
+
     body = {
-        "title":soup.title.string
+        "title": soup.title.string
     }
 
     response = {
@@ -28,6 +33,6 @@ def extracts_title(event, context):
         "body": json.dumps(body)
     }
 
+    logger.info('Response: {}'.format(json.dumps(response)))
+
     return response
-
-
