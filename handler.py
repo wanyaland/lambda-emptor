@@ -19,7 +19,7 @@ def extracts_title(event, context):
     try:
         source = requests.get(url)
     except requests.exceptions.RequestException as exc:
-        logging.info(exc)
+        logger.info(exc)
         sys.exit(1)
 
     soup = BeautifulSoup(source.text, 'html.parser')
