@@ -1,13 +1,18 @@
 
-service: lambda-emptor # NOTE: update this with your service name
+service: lambda-emptor 
+package:
+  exclude:
+    - node_modules/**
+    - .git/**
+    - __pycache__/**
 
 provider:
   name: aws
   runtime: python3.7
-  stage: ${opt:stage}
+  stage: ${opt:stage, 'dev'}
   region: us-east-2
   apiKeys: 
-    - user-key-${opt:stage}
+    - user-key-${opt:stage, 'dev'}
   
 plugins:
   - serverless-python-requirements
@@ -19,4 +24,3 @@ functions:
       - http:
           path: page/title
           method: post
-    Value: "Some output value"
