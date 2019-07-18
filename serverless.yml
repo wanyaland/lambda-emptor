@@ -1,0 +1,22 @@
+
+service: lambda-emptor # NOTE: update this with your service name
+
+provider:
+  name: aws
+  runtime: python3.7
+  stage: ${opt:stage}
+  region: us-east-2
+  apiKeys: 
+    - user-key-${opt:stage}
+  
+plugins:
+  - serverless-python-requirements
+
+functions:
+  extracts_title:
+    handler: handler.extracts_title
+    events:
+      - http:
+          path: page/title
+          method: post
+    Value: "Some output value"
