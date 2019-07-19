@@ -1,3 +1,6 @@
+"""
+This modules handles extraction of page title
+"""
 import json
 import logging
 import sys
@@ -5,6 +8,7 @@ import requests
 
 
 from bs4 import BeautifulSoup
+from requests.exceptions import HTTPError
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -18,7 +22,7 @@ def extracts_title(event, context):
     url = json.loads(event['body'])['url']
     try:
         source = requests.get(url)
-    except requests.exceptions.RequestException as exc:
+    except HTTPError as exc:
         logger.info(exc)
         sys.exit(1)
 
