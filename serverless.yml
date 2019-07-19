@@ -11,6 +11,11 @@ provider:
   runtime: python3.7
   stage: ${opt:stage, 'dev'}
   region: us-east-2
+  deploymentBucket: emptor-title
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action: "s3:*"
+      Resource: "arn:aws:s3:::emptor-title/*"
   apiKeys: 
     - user-key-${opt:stage, 'dev'}
   
