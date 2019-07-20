@@ -3,6 +3,8 @@ A serverless project that webscrapes content from sites
 
 # Installation
 Install the serverless framework - https://serverless.com/framework/docs/providers/aws/guide/installation/
+Install the 'serverless-python-requirements' plugin that handles external packages like the 'requests' package via npm
+-npm install serverless-python-requirements
 
 #Usage
 You can deploy with sls deploy --stage dev command . The stage option takes in the type of environment
