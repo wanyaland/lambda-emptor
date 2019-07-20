@@ -6,7 +6,7 @@ Install the serverless framework - https://serverless.com/framework/docs/provide
 Install the 'serverless-python-requirements' plugin that handles external packages like the 'requests' package via npm
 -npm install serverless-python-requirements
 
-#Usage
+# Usage
 You can deploy with sls deploy --stage dev command . The stage option takes in the type of environment
 to run the handle
 
