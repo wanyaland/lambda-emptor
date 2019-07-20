@@ -1,0 +1,12 @@
+Resources:
+  TitlesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:custom.tableName}
+      AttributeDefinitions:
+        - AttributeName: titleId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: titleId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST

@@ -1,5 +1,6 @@
 
 service: lambda-emptor 
+
 package:
   exclude:
     - node_modules/**
@@ -14,10 +15,24 @@ provider:
   deploymentBucket: emptor-title
   iamRoleStatements:
     - Effect: "Allow"
-      Action: "s3:*"
-      Resource: "arn:aws:s3:::emptor-title/*"
+      Action: 
+        - "s3:*"
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: 
+        - "arn:aws:s3:::emptor-title/*"
+        - "Fn::GetAtt": [ TitlesTable, Arn ]
+
   apiKeys: 
     - user-key-${opt:stage, 'dev'}
+
+custom:
+  tableName: titles-${self:provider.stage}
   
 plugins:
   - serverless-python-requirements
@@ -29,3 +44,9 @@ functions:
       - http:
           path: page/title
           method: post
+
+
+resources:
+  # DynamoDB
+  - ${file(resources/dynamodb-table.yml)}
+

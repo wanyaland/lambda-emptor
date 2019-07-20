@@ -33,6 +33,9 @@ def store_response_to_s3(bucket,title,response):
     
     return True
 
+def store_title_dynamo_db(dyanamoDB,title):
+    pass 
+
 
 def extracts_title(event, context):
     """ Handler that scrapes a web page via given url and
