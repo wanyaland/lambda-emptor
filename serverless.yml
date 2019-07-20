@@ -27,9 +27,12 @@ provider:
       Resource: 
         - "arn:aws:s3:::emptor-title/*"
         - "Fn::GetAtt": [ TitlesTable, Arn ]
+  
+
 
   apiKeys: 
     - user-key-${opt:stage, 'dev'}
+
 
 custom:
   tableName: titles-${self:provider.stage}
@@ -40,6 +43,9 @@ plugins:
 functions:
   extracts_title:
     handler: handler.extracts_title
+    environment:
+       TITLES_TABLE: ${self:custom.tableName}
+       BUCKET: ${self:provider.deploymentBucket}
     events:
       - http:
           path: page/title
