@@ -29,10 +29,10 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-        - lambda:InvokeFunction
+        - dynamodb:ListStreams
       Resource: 
         - "arn:aws:s3:::emptor-title/*"
-        - "Fn::GetAtt": [ URLTable, Arn ]
+        - "Fn::GetAtt": [URLTable, Arn ]
         - "*"
   
 
@@ -41,7 +41,6 @@ provider:
 
 
 custom:
-  tableName: titles-${self:provider.stage}
   urlTable: url-table-${self:provider.stage}
 
   
@@ -58,6 +57,15 @@ functions:
 
   extracts_title:
     handler: handler.extracts_title
+    events:
+      - stream:
+          type: dynamodb
+          batchsize: 1
+          startingPosition: LATEST
+          arn:
+            Fn::GetAtt:
+              - URLTable
+              - StreamArn
 
 resources:
   # DynamoDB

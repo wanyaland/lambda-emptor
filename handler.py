@@ -3,7 +3,6 @@ This modules handles extraction of page title
 and storage of response to s3 and title to dynamoDB services
 """
 
-import asyncio
 import json
 import logging
 import sys
@@ -96,7 +95,7 @@ def update_dynamo_db_record(table_name, identifier, attributes, **kwargs):
                 "ExpressionAttributeValues": {":val1": value},
             }
             if key in attributes:
-                update_params["ExpressionAttributeNames"] = { attribute_name : key }
+                update_params["ExpressionAttributeNames"] = {attribute_name: key}
 
             client.update_item(**update_params)
 
@@ -135,6 +134,7 @@ def create_identifier(event, context):
     else:
         logger.info("{} failed to get stored in {}".format(url, URL_TABLE))
 
+    """
     # invoke extracts_title asynchronously
     lambda_client = boto3.client("lambda")
     payload = {"identifier": request_identifier}
@@ -143,6 +143,7 @@ def create_identifier(event, context):
         InvocationType="Event",
         Payload=json.dumps(payload),
     )
+    """
 
     body = {"url_identifier": request_identifier}
 
@@ -154,47 +155,53 @@ def create_identifier(event, context):
 
 
 def extracts_title(event, context):
-    """ Handler that scrapes a web page via given identifier tied to a url
+    """ Handler that is invoked by DB stream activity .
+        Scrapes a web page via given identifier tied to a url
         and returns json body that contains the title of the web page
     """
     logger.info("Event received: {}".format(event))
-    identifier = event["identifier"]
-    data = get_data(URL_TABLE, identifier)
-    logger.info(data)
-    url = data["Item"]["url"]["S"]
-    # url = json.loads(event['body'])['url']
-    try:
-        source = requests.get(url)
-    except HTTPError as exc:
-        logger.info(exc)
-        sys.exit(1)
+    for record in event.get("Records"):
+        if record.get("eventName") == "INSERT":
+            identifier = record["dynamodb"]["NewImage"]["identifier"]["S"]
+            data = get_data(URL_TABLE, identifier)
+            logger.info(data)
+            url = data["Item"]["url"]["S"]
+            # url = json.loads(event['body'])['url']
+            try:
+                source = requests.get(url)
+            except HTTPError as exc:
+                logger.info(exc)
+                sys.exit(1)
+            soup = BeautifulSoup(source.text, "html.parser")
+            body = {"title": soup.title.string}
+            # Store response body to s3 bucket
+            extracted_title = soup.title.string
+            s3_success, s3_url = store_response_to_s3(extracted_title, body)
+            if s3_success:
+                logger.info(
+                    "{} added to {} bucket".format(json.dumps(body, indent=2), BUCKET)
+                )
+            else:
+                logger.info(
+                    "Failed to add {}  to {} bucket".format(
+                        json.dumps(body, indent=2), BUCKET
+                    )
+                )
 
-    soup = BeautifulSoup(source.text, "html.parser")
+            # Update record identified by identifier key
 
-    body = {"title": soup.title.string}
+            success_updated = update_dynamo_db_record(
+                URL_TABLE,
+                identifier,
+                ["status", "url"],
+                title={"S": soup.title.string},
+                s3_url={"S": s3_url},
+                status={"S": "PROCESSED"},
+            )
 
-    # Store response body to s3 bucket
-    extracted_title = soup.title.string
-    s3_success, s3_url = store_response_to_s3(extracted_title, body)
-    if s3_success:
-        logger.info("{} added to {} bucket".format(json.dumps(body, indent=2), BUCKET))
-    else:
-        logger.info(
-            "Failed to add {}  to {} bucket".format(json.dumps(body, indent=2), BUCKET)
-        )
-
-    # Update record identified by identifier key
-
-    success_updated = update_dynamo_db_record(
-        URL_TABLE,
-        identifier,
-        ["status", "url"],
-        title={"S": soup.title.string},
-        s3_url={"S": s3_url},
-        status={"S": "PROCESSED"},
-    )
-
-    if success_updated:
-        logger.info("{} record updated".format(identifier))
-    else:
-        logger.info("Failed to update record identified by {}".format(identifier))
+            if success_updated:
+                logger.info("{} record updated".format(identifier))
+            else:
+                logger.info(
+                    "Failed to update record identified by {}".format(identifier)
+                )
