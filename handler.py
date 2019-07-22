@@ -67,20 +67,48 @@ def save_to_dynamo_db(table_name, **kwargs):
             Item={
                 "identifier": {"S": identifier},
                 "url": {"S": url},
-                "state": {"S": state},
+                "status": {"S": state},
             },
         )
     except Exception as exc:
         logger.info(exc)
         sys.exit()
-        return False
 
+    return True
+
+
+def update_dynamo_db_record(table_name, identifier, attributes, **kwargs):
+    """Function that updates a given record in aws dynamo_db
+       with s3_url , status and extracted title
+       :param table_name: Table to be updated
+       :identifier: Key that identifies the record
+       :attributes: List of attributes existing in record
+       :**kwargs: keyword args for records to be updated in the table
+       that contains attribute and value to be updated
+    """
+    try:
+        for key, value in kwargs.items():
+            attribute_name = "#{}".format(str(key[:2])) if key in attributes else key
+            update_params = {
+                "TableName": table_name,
+                "Key": {"identifier": {"S": identifier}},
+                "UpdateExpression": "SET {} = :val1".format(attribute_name),
+                "ExpressionAttributeValues": {":val1": value},
+            }
+            if key in attributes:
+                update_params["ExpressionAttributeNames"] = { attribute_name : key }
+
+            client.update_item(**update_params)
+
+    except Exception as exc:
+        logger.info(exc)
+        sys.exit()
     return True
 
 
 def get_data(table, identifier):
     try:
-        data = client.get_item(TableName=table, key={"identifier": identifier})
+        data = client.get_item(TableName=table, Key={"identifier": {"S": identifier}})
     except Exception as exc:
         logger.info("get_data error")
         logger.info(exc)
@@ -109,8 +137,11 @@ def create_identifier(event, context):
 
     # invoke extracts_title asynchronously
     lambda_client = boto3.client("lambda")
+    payload = {"identifier": request_identifier}
     lambda_client.invoke(
-        FunctionName="{}-{}-extracts_title".format(SERVICE,STAGING), InvocationType="Event"
+        FunctionName="{}-{}-extracts_title".format(SERVICE, STAGING),
+        InvocationType="Event",
+        Payload=json.dumps(payload),
     )
 
     body = {"url_identifier": request_identifier}
@@ -123,18 +154,14 @@ def create_identifier(event, context):
 
 
 def extracts_title(event, context):
-    """ Handler that scrapes a web page via given url and
-        returns json body that contains the title of the web page
+    """ Handler that scrapes a web page via given identifier tied to a url
+        and returns json body that contains the title of the web page
     """
-    logger.info("Event received: {}".format(json.dumps(event)))
-    body = {"message": "{} - from the other function".format(event)}
-
-    response = {"statusCode": 200, "body": json.dumps(body)}
-
-    return response
-    """
-    data = get_data(identifier)
-    url = data['url']
+    logger.info("Event received: {}".format(event))
+    identifier = event["identifier"]
+    data = get_data(URL_TABLE, identifier)
+    logger.info(data)
+    url = data["Item"]["url"]["S"]
     # url = json.loads(event['body'])['url']
     try:
         source = requests.get(url)
@@ -156,20 +183,18 @@ def extracts_title(event, context):
             "Failed to add {}  to {} bucket".format(json.dumps(body, indent=2), BUCKET)
         )
 
-    # Store extracted title as a record in Dynamo DB
-    dynamodb_success = store_title_dynamo_db(soup.title.string)
+    # Update record identified by identifier key
 
-    if dynamodb_success:
-        logger.info("{} stored in table {}".format(soup.title.string, TITLES_TABLE))
+    success_updated = update_dynamo_db_record(
+        URL_TABLE,
+        identifier,
+        ["status", "url"],
+        title={"S": soup.title.string},
+        s3_url={"S": s3_url},
+        status={"S": "PROCESSED"},
+    )
+
+    if success_updated:
+        logger.info("{} record updated".format(identifier))
     else:
-        logger.info(
-            "{} failed to get stored in {}".format(soup.title.string, TITLES_TABLE)
-        )
-
-    body = {"title": soup.title.string, "s3_url": s3_url}
-    response = {"statusCode": 200, "body": json.dumps(body)}
-
-    logger.info("Response: {}".format(json.dumps(response)))
-
-    return response
-    """
+        logger.info("Failed to update record identified by {}".format(identifier))

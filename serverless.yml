@@ -13,6 +13,11 @@ provider:
   stage: ${opt:stage, 'dev'}
   region: us-east-2
   deploymentBucket: emptor-title
+  environment:
+    URL_TABLE: ${self:custom.urlTable}
+    BUCKET: ${self:provider.deploymentBucket}
+    SERVICE: ${self:service}
+    STAGING: ${self:provider.stage}
   iamRoleStatements:
     - Effect: "Allow"
       Action: 
@@ -27,7 +32,7 @@ provider:
         - lambda:InvokeFunction
       Resource: 
         - "arn:aws:s3:::emptor-title/*"
-        - "Fn::GetAtt": [ TitlesTable, Arn ]
+        - "Fn::GetAtt": [ URLTable, Arn ]
         - "*"
   
 
@@ -46,11 +51,6 @@ plugins:
 functions:
   create_identifier:
     handler: handler.create_identifier
-    environment:
-       URL_TABLE: ${self:custom.urlTable}
-       BUCKET: ${self:provider.deploymentBucket}
-       SERVICE: ${self:service}
-       STAGING: ${self:provider.stage}
     events:
       - http:
           path: page/title
