@@ -10,3 +10,15 @@ Resources:
         - AttributeName: titleId
           KeyType: HASH
       BillingMode: PAY_PER_REQUEST
+  
+  URLTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ${self:custom.urlTable}
+      AttributeDefinitions:
+        - AttributeName: identifier
+          AttributeType: S
+      KeySchema:
+        - AttributeName: identifier
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST

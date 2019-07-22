@@ -24,9 +24,11 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
+        - lambda:InvokeFunction
       Resource: 
         - "arn:aws:s3:::emptor-title/*"
         - "Fn::GetAtt": [ TitlesTable, Arn ]
+        - "*"
   
 
 
@@ -36,21 +38,25 @@ provider:
 
 custom:
   tableName: titles-${self:provider.stage}
+  urlTable: url-table-${self:provider.stage}
+
   
 plugins:
   - serverless-python-requirements
 
 functions:
-  extracts_title:
-    handler: handler.extracts_title
+  create_identifier:
+    handler: handler.create_identifier
     environment:
-       TITLES_TABLE: ${self:custom.tableName}
+       URL_TABLE: ${self:custom.urlTable}
        BUCKET: ${self:provider.deploymentBucket}
     events:
       - http:
           path: page/title
           method: post
-
+          
+  extracts_title:
+    handler: handler.extracts_title
 
 resources:
   # DynamoDB
