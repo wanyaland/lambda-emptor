@@ -31,7 +31,6 @@ provider:
         - "*"
   
 
-
   apiKeys: 
     - user-key-${opt:stage, 'dev'}
 
@@ -50,11 +49,13 @@ functions:
     environment:
        URL_TABLE: ${self:custom.urlTable}
        BUCKET: ${self:provider.deploymentBucket}
+       SERVICE: ${self:service}
+       STAGING: ${self:provider.stage}
     events:
       - http:
           path: page/title
           method: post
-          
+
   extracts_title:
     handler: handler.extracts_title
 

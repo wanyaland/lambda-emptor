@@ -23,6 +23,8 @@ logger.setLevel(logging.INFO)
 
 URL_TABLE = os.environ["URL_TABLE"]
 BUCKET = os.environ["BUCKET"]
+SERVICE = os.environ["SERVICE"]
+STAGING = os.environ["STAGING"]
 
 
 def store_response_to_s3(title, response):
@@ -57,16 +59,16 @@ def save_to_dynamo_db(table_name, **kwargs):
     :return: True if saved to dynamo_db
     """
     try:
-        identifier = kwargs['identifier']
-        url = kwargs['url']
-        state = kwargs['state']
+        identifier = kwargs["identifier"]
+        url = kwargs["url"]
+        state = kwargs["state"]
         client.put_item(
-            TableName=table_name, 
-            Item= {
-                'identifier':{'S':identifier},
-                'url':{'S':url},
-                'state':{'S':state}
-            }
+            TableName=table_name,
+            Item={
+                "identifier": {"S": identifier},
+                "url": {"S": url},
+                "state": {"S": state},
+            },
         )
     except Exception as exc:
         logger.info(exc)
@@ -80,7 +82,7 @@ def get_data(table, identifier):
     try:
         data = client.get_item(TableName=table, key={"identifier": identifier})
     except Exception as exc:
-        logger.info('get_data error')
+        logger.info("get_data error")
         logger.info(exc)
         sys.exit()
     logger.info("{} returned by identifier {}".format(data, identifier))
@@ -89,13 +91,13 @@ def get_data(table, identifier):
 
 def create_identifier(event, context):
     """
-    Function that stores given url and creates an identifier that acts 
-    as the key 
+    Handler  that stores given url , creates an identifier that acts 
+    as the key and invokes the extract_title handler asynchronously
     """
     url = json.loads(event["body"])["url"]
     request_identifier = str(uuid.uuid4())
 
-    # Store url keyed by identifier as well as state in Dynamo DB
+    # Store url keyed by identifier as well as pending state in Dynamo DB
     dynamodb_success = save_to_dynamo_db(
         URL_TABLE, identifier=request_identifier, url=url, state="PENDING"
     )
@@ -107,16 +109,15 @@ def create_identifier(event, context):
 
     # invoke extracts_title asynchronously
     lambda_client = boto3.client("lambda")
-    response = lambda_client.invoke(
-        FunctionName='lambda-emptor-dev-extracts_title',
-        InvocationType='Event'
+    lambda_client.invoke(
+        FunctionName="{}-{}-extracts_title".format(SERVICE,STAGING), InvocationType="Event"
     )
-
-    logger.info('Response {} from invoked asynchronous function '.format(response))
 
     body = {"url_identifier": request_identifier}
 
     response = {"statusCode": 200, "body": json.dumps(body)}
+
+    logger.info("Response {} from create_identifier handler ".format(response))
 
     return response
 
@@ -126,17 +127,12 @@ def extracts_title(event, context):
         returns json body that contains the title of the web page
     """
     logger.info("Event received: {}".format(json.dumps(event)))
-    body = {
-        "message": "{} - from the other function". format(event),
-    }
+    body = {"message": "{} - from the other function".format(event)}
 
-    response = {
-        "statusCode": 200,
-        "body": json.dumps(body)
-    }
-    
+    response = {"statusCode": 200, "body": json.dumps(body)}
+
     return response
-    '''
+    """
     data = get_data(identifier)
     url = data['url']
     # url = json.loads(event['body'])['url']
@@ -176,4 +172,4 @@ def extracts_title(event, context):
     logger.info("Response: {}".format(json.dumps(response)))
 
     return response
-    '''
+    """
