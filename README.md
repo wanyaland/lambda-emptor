@@ -1,4 +1,4 @@
-# lambda-emptor
+# Emptor software engineering - Trial project
 A serverless project that webscrapes content from sites
 
 # Installation
