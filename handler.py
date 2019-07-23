@@ -80,9 +80,9 @@ def update_dynamo_db_record(table_name, identifier, attributes, **kwargs):
     """Function that updates a given record in aws dynamo_db
        with s3_url , status and extracted title
        :param table_name: Table to be updated
-       :identifier: Key that identifies the record
-       :attributes: List of attributes existing in record
-       :**kwargs: keyword args for records to be updated in the table
+       :param identifier: Key that identifies the record
+       :param attributes: List of attributes existing in record
+       :param **kwargs: keyword args for records to be updated in the table
        that contains attribute and value to be updated
     """
     try:
@@ -116,6 +116,32 @@ def get_data(table, identifier):
     return data
 
 
+def scrape_page(url):
+    """ Function that scrapes a web page
+        :param url: parameter that used to make get request
+        and page is scraped 
+        :return : Returns tuple of title and s3_url link
+    """
+    try:
+        source = requests.get(url)
+        soup = BeautifulSoup(source.text, "html.parser")
+    except Exception as exc:
+        logger.info(exc)
+        sys.exit()
+    title = soup.title.string
+    body = {"title": soup.title.string}
+    # Store response body to s3 bucket
+    extracted_title = soup.title.string
+    s3_success, s3_url = store_response_to_s3(extracted_title, body)
+    if s3_success:
+        logger.info("{} added to {} bucket".format(json.dumps(body, indent=2), BUCKET))
+    else:
+        logger.info(
+            "Failed to add {}  to {} bucket".format(json.dumps(body, indent=2), BUCKET)
+        )
+    return (title, s3_url)
+
+
 def create_identifier(event, context):
     """
     Handler  that stores given url , creates an identifier that acts 
@@ -133,17 +159,6 @@ def create_identifier(event, context):
         logger.info("{} stored in table {}".format(url, URL_TABLE))
     else:
         logger.info("{} failed to get stored in {}".format(url, URL_TABLE))
-
-    """
-    # invoke extracts_title asynchronously
-    lambda_client = boto3.client("lambda")
-    payload = {"identifier": request_identifier}
-    lambda_client.invoke(
-        FunctionName="{}-{}-extracts_title".format(SERVICE, STAGING),
-        InvocationType="Event",
-        Payload=json.dumps(payload),
-    )
-    """
 
     body = {"url_identifier": request_identifier}
 
@@ -166,35 +181,13 @@ def extracts_title(event, context):
             data = get_data(URL_TABLE, identifier)
             logger.info(data)
             url = data["Item"]["url"]["S"]
-            # url = json.loads(event['body'])['url']
-            try:
-                source = requests.get(url)
-            except HTTPError as exc:
-                logger.info(exc)
-                sys.exit(1)
-            soup = BeautifulSoup(source.text, "html.parser")
-            body = {"title": soup.title.string}
-            # Store response body to s3 bucket
-            extracted_title = soup.title.string
-            s3_success, s3_url = store_response_to_s3(extracted_title, body)
-            if s3_success:
-                logger.info(
-                    "{} added to {} bucket".format(json.dumps(body, indent=2), BUCKET)
-                )
-            else:
-                logger.info(
-                    "Failed to add {}  to {} bucket".format(
-                        json.dumps(body, indent=2), BUCKET
-                    )
-                )
-
+            title, s3_url = scrape_page(url)
             # Update record identified by identifier key
-
             success_updated = update_dynamo_db_record(
                 URL_TABLE,
                 identifier,
                 ["status", "url"],
-                title={"S": soup.title.string},
+                title={"S": title},
                 s3_url={"S": s3_url},
                 status={"S": "PROCESSED"},
             )
