@@ -60,7 +60,7 @@ def save_to_dynamo_db(table_name, **kwargs):
     try:
         identifier = kwargs["identifier"]
         url = kwargs["url"]
-        state = kwargs["state"]
+        state = kwargs["status"]
         client.put_item(
             TableName=table_name,
             Item={
@@ -126,7 +126,7 @@ def create_identifier(event, context):
 
     # Store url keyed by identifier as well as pending state in Dynamo DB
     dynamodb_success = save_to_dynamo_db(
-        URL_TABLE, identifier=request_identifier, url=url, state="PENDING"
+        URL_TABLE, identifier=request_identifier, url=url, status="PENDING"
     )
 
     if dynamodb_success:
