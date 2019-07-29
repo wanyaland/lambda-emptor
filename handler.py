@@ -13,17 +13,16 @@ import uuid
 import boto3
 import requests
 from bs4 import BeautifulSoup
+from botocore.exceptions import ClientError
 from requests.exceptions import HTTPError
 
 
-client = boto3.client("dynamodb")
+ddb_client = boto3.client("dynamodb")
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 URL_TABLE = os.environ["URL_TABLE"]
 BUCKET = os.environ["BUCKET"]
-SERVICE = os.environ["SERVICE"]
-STAGING = os.environ["STAGING"]
 
 
 def store_response_to_s3(title, response):
@@ -45,7 +44,7 @@ def store_response_to_s3(title, response):
         )
         s3_url = "%s/%s/%s" % (s3_client.meta.endpoint_url, BUCKET, key)
 
-    except Exception as exc:
+    except (ClientError, KeyError) as exc:
         logger.error(exc)
         return (False, None)
 
@@ -61,7 +60,7 @@ def save_to_dynamo_db(table_name, **kwargs):
         identifier = kwargs["identifier"]
         url = kwargs["url"]
         state = kwargs["status"]
-        client.put_item(
+        ddb_client.put_item(
             TableName=table_name,
             Item={
                 "identifier": {"S": identifier},
@@ -69,7 +68,7 @@ def save_to_dynamo_db(table_name, **kwargs):
                 "status": {"S": state},
             },
         )
-    except Exception as exc:
+    except (ClientError, KeyError) as exc:
         logger.info(exc)
         sys.exit()
 
@@ -97,9 +96,9 @@ def update_dynamo_db_record(table_name, identifier, attributes, **kwargs):
             if key in attributes:
                 update_params["ExpressionAttributeNames"] = {attribute_name: key}
 
-            client.update_item(**update_params)
+            ddb_client.update_item(**update_params)
 
-    except Exception as exc:
+    except ClientError as exc:
         logger.info(exc)
         sys.exit()
     return True
@@ -107,8 +106,10 @@ def update_dynamo_db_record(table_name, identifier, attributes, **kwargs):
 
 def get_data(table, identifier):
     try:
-        data = client.get_item(TableName=table, Key={"identifier": {"S": identifier}})
-    except Exception as exc:
+        data = ddb_client.get_item(
+            TableName=table, Key={"identifier": {"S": identifier}}
+        )
+    except ClientError as exc:
         logger.info("get_data error")
         logger.info(exc)
         sys.exit()
@@ -125,7 +126,7 @@ def scrape_page(url):
     try:
         source = requests.get(url)
         soup = BeautifulSoup(source.text, "html.parser")
-    except Exception as exc:
+    except HTTPError as exc:
         logger.info(exc)
         sys.exit()
     title = soup.title.string
